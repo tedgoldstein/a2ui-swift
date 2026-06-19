@@ -494,9 +494,7 @@ private func basicPluralize(_ name: String, _ args: [String: AnyCodable], _ cont
 
 private func basicOpenUrl(_ name: String, _ args: [String: AnyCodable], _ context: DataContext) throws -> AnyCodable? {
     let urlString = try coerceRequiredString(args["url"], argName: "url", funcName: name)
-    guard let url = URL(string: urlString) else {
-        throw A2uiExpressionError("Invalid URL '\(urlString)' for '\(name)'", expression: name)
-    }
+    let url = try A2UISafeURL.resolve(urlString)
 #if canImport(UIKit) && !os(watchOS)
     DispatchQueue.main.async { UIApplication.shared.open(url) }
 #elseif canImport(AppKit)

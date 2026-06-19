@@ -652,8 +652,40 @@ struct BasicFunctionsTests {
 
     @Suite("Actions")
     struct ActionsTests {
-        // NOTE: "openUrl" is not unit-tested.
-        // Requires UIApplication.shared (iOS) or NSWorkspace.shared (macOS) — unavailable
-        // in Swift Testing without a running app environment.
+        @Test("openUrl rejects non-HTTP URL schemes before platform side effects")
+        func openUrlRejectsUnsafeSchemes() throws {
+            let (catalog, context) = try makeContext()
+            let invalidURLs = [
+                "javascript:alert(document.domain)",
+                "  javascript:alert(1)",
+                "data:text/html,<script>alert(1)</script>",
+                "file:///etc/passwd",
+                "about:blank",
+                "x-legion-private://boot",
+            ]
+
+            for url in invalidURLs {
+                #expect(throws: A2uiExpressionError.self) {
+                    try invoke("openUrl", ["url": .string(url)], catalog: catalog, context: context)
+                }
+            }
+        }
+
+        @Test("A2UISafeURL resolves relative URLs against an explicit host base")
+        func safeURLResolvesRelativeAgainstBase() throws {
+            let base = URL(string: "https://example.com/sub/page")!
+            #expect(try A2UISafeURL.resolve("/root", baseURL: base).absoluteString == "https://example.com/root")
+            #expect(try A2UISafeURL.resolve("child", baseURL: base).absoluteString == "https://example.com/sub/child")
+            #expect(try A2UISafeURL.resolve("?tab=profile", baseURL: base).absoluteString == "https://example.com/sub/page?tab=profile")
+        }
+
+        @Test("A2UISafeURL only allows HTTP and HTTPS")
+        func safeURLSchemeAllowlist() throws {
+            #expect(try A2UISafeURL.resolve("https://a2ui.org").scheme == "https")
+            #expect(try A2UISafeURL.resolve("http://example.com").scheme == "http")
+            #expect(throws: A2uiExpressionError.self) {
+                try A2UISafeURL.resolve("mailto:person@example.com")
+            }
+        }
     }
 }

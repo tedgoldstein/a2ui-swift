@@ -61,7 +61,7 @@ final class A2UIVideo: PlatformView, A2UIPlatformComponent {
     }
 
     private func setURL(_ string: String) {
-        guard let url = URL(string: string), !string.isEmpty else { return }
+        guard let url = A2UISafeURL.allowed(string) else { return }
         let player = AVPlayer(url: url)
         #if canImport(UIKit) && !os(watchOS)
         controller.player = player

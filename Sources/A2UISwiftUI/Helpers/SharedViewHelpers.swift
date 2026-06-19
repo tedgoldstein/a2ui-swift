@@ -90,7 +90,7 @@ struct AudioPlayerNodeView: View {
         .clipShape(RoundedRectangle(cornerRadius: apStyle.cornerRadius ?? 10))
         .task(id: url) {
             guard let uiState, uiState.player == nil,
-                  !url.isEmpty, let mediaUrl = URL(string: url) else { return }
+                  let mediaUrl = A2UISafeURL.allowed(url) else { return }
             let player = await Task.detached(priority: .userInitiated) {
                 AVPlayer(url: mediaUrl)
             }.value
@@ -272,7 +272,7 @@ struct VideoNodeView: View {
     private var posterView: some View {
         Button {
             if let uiState {
-                if uiState.player == nil, let url = URL(string: urlString) {
+                if uiState.player == nil, let url = A2UISafeURL.allowed(urlString) {
                     uiState.player = AVPlayer(url: url)
                 }
                 if let player = uiState.player {
@@ -327,7 +327,7 @@ struct VideoNodeView: View {
         let urlStr = urlString
         let capturedState = uiState
         Task.detached(priority: .utility) {
-            guard let url = URL(string: urlStr) else { return }
+            guard let url = A2UISafeURL.allowed(urlStr) else { return }
             let asset = AVURLAsset(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true

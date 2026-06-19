@@ -412,6 +412,93 @@ struct A2UITransportAdapterTests {
         #expect(allText.contains("Before"))
         #expect(allText.contains("After"))
     }
+
+    @Test("MCP resource payload decodes application/a2ui+json text")
+    func mcpResourcePayloadDecodesMessages() throws {
+        let messages = try A2UIMCPPayload.messages(
+            fromResource: [
+                "uri": .string("a2ui://legion/boot"),
+                "mimeType": .string(A2UIMCPPayload.mimeType),
+                "text": .string(createSurfaceJSON),
+            ]
+        )
+
+        #expect(messages.count == 1)
+        if case .createSurface(let payload) = messages.first {
+            #expect(payload.surfaceId == "s1")
+        } else {
+            Issue.record("Expected .createSurface from MCP resource payload")
+        }
+    }
+
+    @Test("MCP embedded resource payload decodes arrays of A2UI messages")
+    func mcpEmbeddedResourcePayloadDecodesArray() throws {
+        let deleteSurfaceJSON = #"{"version":"v0.9","deleteSurface":{"surfaceId":"s1"}}"#
+        let messages = try A2UIMCPPayload.messages(
+            fromEmbeddedResource: [
+                "type": .string("resource"),
+                "resource": .dictionary([
+                    "uri": .string("a2ui://legion/boot"),
+                    "mimeType": .string("application/a2ui+json; charset=utf-8"),
+                    "text": .string("[\(createSurfaceJSON),\(deleteSurfaceJSON)]"),
+                ]),
+            ]
+        )
+
+        #expect(messages.count == 2)
+        if case .createSurface = messages[0] {
+            // expected
+        } else {
+            Issue.record("Expected first MCP message to create a surface")
+        }
+        if case .deleteSurface(let payload) = messages[1] {
+            #expect(payload.surfaceId == "s1")
+        } else {
+            Issue.record("Expected second MCP message to delete the surface")
+        }
+    }
+
+    @Test("MCP payload rejects non-A2UI MIME types")
+    func mcpPayloadRejectsWrongMimeType() {
+        #expect(throws: A2UIMCPPayloadError.self) {
+            try A2UIMCPPayload.messages(
+                fromResource: [
+                    "mimeType": .string("application/json"),
+                    "text": .string(createSurfaceJSON),
+                ]
+            )
+        }
+    }
+
+    @Test("A2UITransportAdapter can ingest MCP embedded resources")
+    func adapterIngestsMCPEmbeddedResource() async throws {
+        let adapter = A2UITransportAdapter()
+        let messages = MessageCollector()
+        let task = Task {
+            for await message in adapter.incomingMessages {
+                await messages.append(message)
+            }
+        }
+
+        try adapter.addMCPResource([
+            "type": .string("resource"),
+            "resource": .dictionary([
+                "uri": .string("a2ui://legion/boot"),
+                "mimeType": .string(A2UIMCPPayload.mimeType),
+                "text": .string(createSurfaceJSON),
+            ]),
+        ])
+        await adapter.finish()
+        await task.value
+
+        let collected = await messages.items
+        #expect(collected.count == 1)
+        if case .createSurface(let payload) = collected.first {
+            #expect(payload.surfaceId == "s1")
+        } else {
+            Issue.record("Expected adapter to emit .createSurface from MCP resource")
+        }
+    }
 }
 
 

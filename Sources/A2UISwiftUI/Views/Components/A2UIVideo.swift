@@ -36,7 +36,7 @@ struct A2UIVideo: View {
             let urlString = dc.resolve(props.url)
             let cr = style.videoStyle.cornerRadius ?? 10
             Group {
-                if !urlString.isEmpty, URL(string: urlString) != nil {
+                if A2UISafeURL.allowed(urlString) != nil {
                     VideoNodeView(
                         urlString: urlString,
                         uiState: node.uiState as? VideoUIState,

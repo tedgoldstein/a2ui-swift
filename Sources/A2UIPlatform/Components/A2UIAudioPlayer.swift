@@ -77,7 +77,7 @@ final class A2UIAudioPlayer: PlatformView, A2UIPlatformComponent {
         player = nil
         playing = false
         setTitle("Play")
-        guard let url = URL(string: string), !string.isEmpty else { return }
+        guard let url = A2UISafeURL.allowed(string) else { return }
         let player = AVPlayer(url: url)
         self.player = player
 
