@@ -20,9 +20,16 @@ import Foundation
 
 // MARK: - Test Fixtures
 
-private func makeContext(locale: String? = nil) throws -> (catalog: Catalog, context: DataContext) {
+private final class OpenURLRecorder: @unchecked Sendable {
+    var urls: [URL] = []
+}
+
+private func makeContext(
+    locale: String? = nil,
+    hostServices: A2UIHostServices = .denying
+) throws -> (catalog: Catalog, context: DataContext) {
     let catalog = Catalog(id: "basic", functions: BASIC_FUNCTIONS)
-    let surface = SurfaceModel(id: "s1", catalog: catalog, locale: locale)
+    let surface = SurfaceModel(id: "s1", catalog: catalog, locale: locale, hostServices: hostServices)
     try surface.dataModel.set("/", value: .dictionary(["a": .number(10), "b": .number(20)]))
     let context = DataContext(surface: surface, path: "/")
     return (catalog, context)
@@ -652,6 +659,27 @@ struct BasicFunctionsTests {
 
     @Suite("Actions")
     struct ActionsTests {
+        @Test("openUrl requests a host handler instead of opening the platform directly")
+        func openURLRequiresHostHandler() throws {
+            let (catalog, context) = try makeContext()
+            #expect(throws: A2uiExpressionError.self) {
+                try invoke("openUrl", ["url": .string("https://example.com")], catalog: catalog, context: context)
+            }
+        }
+
+        @Test("openUrl forwards validated URLs to the host handler")
+        func openURLForwardsToHostHandler() throws {
+            let recorder = OpenURLRecorder()
+            let hostServices = A2UIHostServices { url in
+                recorder.urls.append(url)
+            }
+            let (catalog, context) = try makeContext(hostServices: hostServices)
+
+            try invoke("openUrl", ["url": .string("https://example.com/path")], catalog: catalog, context: context)
+
+            #expect(recorder.urls.map(\.absoluteString) == ["https://example.com/path"])
+        }
+
         @Test("openUrl rejects non-HTTP URL schemes before platform side effects")
         func openUrlRejectsUnsafeSchemes() throws {
             let (catalog, context) = try makeContext()
@@ -685,6 +713,58 @@ struct BasicFunctionsTests {
             #expect(try A2UISafeURL.resolve("http://example.com").scheme == "http")
             #expect(throws: A2uiExpressionError.self) {
                 try A2UISafeURL.resolve("mailto:person@example.com")
+            }
+        }
+
+        @Test("A2UISafeURL rejects URL credentials and local network destinations")
+        func safeURLRejectsCredentialsAndLocalNetworkDestinations() throws {
+            let invalidURLs = [
+                "https://apple.com@evil.example/path",
+                "https://user:pass@example.com/path",
+                "http://localhost:3000",
+                "http://dev.local/status",
+                "http://127.0.0.1/status",
+                "http://0.0.0.0/status",
+                "http://10.1.2.3/status",
+                "http://172.16.0.1/status",
+                "http://192.168.1.1/status",
+                "http://100.64.0.1/status",
+                "http://169.254.169.254/latest/meta-data",
+                "http://[::1]/status",
+                "http://[fe80::1]/status",
+                "http://[fc00::1]/status",
+            ]
+
+            for url in invalidURLs {
+                #expect(throws: A2uiExpressionError.self) {
+                    try A2UISafeURL.resolve(url, purpose: .image)
+                }
+            }
+        }
+
+        @Test("A2UISafeURL can be made permissive for trusted development fixtures")
+        func safeURLPermissivePolicyAllowsLocalDevelopmentHosts() throws {
+            let policy = A2UIURLPolicy.permissiveHTTP
+
+            #expect(try A2UISafeURL.resolve(
+                "http://127.0.0.1:8080/status",
+                policy: policy
+            ).host == "127.0.0.1")
+            #expect(try A2UISafeURL.resolve(
+                "http://dev.local/status",
+                policy: policy
+            ).host == "dev.local")
+            #expect(try A2UISafeURL.resolve(
+                "https://user:pass@example.com/path",
+                policy: policy
+            ).host == "example.com")
+        }
+
+        @Test("A2UISafeURL rejects host changes when resolving against a base URL")
+        func safeURLRejectsRelativeHostChanges() throws {
+            let base = URL(string: "https://example.com/sub/page")!
+            #expect(throws: A2uiExpressionError.self) {
+                try A2UISafeURL.resolve("//evil.example/path", baseURL: base)
             }
         }
     }

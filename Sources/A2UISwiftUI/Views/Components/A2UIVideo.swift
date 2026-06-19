@@ -36,12 +36,13 @@ struct A2UIVideo: View {
             let urlString = dc.resolve(props.url)
             let cr = style.videoStyle.cornerRadius ?? 10
             Group {
-                if A2UISafeURL.allowed(urlString) != nil {
+                if surface.hostServices.allowedURL(urlString, purpose: .video) != nil {
                     VideoNodeView(
                         urlString: urlString,
                         uiState: node.uiState as? VideoUIState,
                         nodeId: node.id,
-                        cornerRadius: cr
+                        cornerRadius: cr,
+                        hostServices: surface.hostServices
                     )
                 } else {
                     RoundedRectangle(cornerRadius: cr)

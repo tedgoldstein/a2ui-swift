@@ -134,7 +134,10 @@ Issues and pull requests are welcome — whether it's a new catalog component, a
 
 ## 📄 License
 
-[MIT](LICENSE)
+This fork has mixed provenance. The root package license is [MIT](LICENSE), while
+many inherited source files retain file-level Apache-2.0 / Google LLC notices and
+the `Primitives` sources retain GenUI Authors notices. See [NOTICE](NOTICE)
+before redistributing.
 
 <div align="center">
 <sub>Built for the <a href="https://github.com/google/A2UI">A2UI</a> ecosystem · Swift on every Apple platform</sub>

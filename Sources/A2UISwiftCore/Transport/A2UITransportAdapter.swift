@@ -69,9 +69,10 @@ public final class A2UITransportAdapter: A2UITransport, Sendable {
     private let _textContinuation:    AsyncStream<String>.Continuation
     private let _messageContinuation: AsyncStream<A2uiMessage>.Continuation
     private let _onSend:              ManualSendCallback?
+    private let _dataModelProvider:   (@Sendable () -> A2uiClientDataModel?)?
 
-    public nonisolated(unsafe) var clientCapabilities: A2uiClientCapabilities?
-    public nonisolated(unsafe) var dataModelProvider: (() -> A2uiClientDataModel?)?
+    public let clientCapabilities: A2uiClientCapabilities?
+    public var dataModelProvider: (@Sendable () -> A2uiClientDataModel?)? { _dataModelProvider }
 
     /// A stream of sanitized text for the chat UI.
     ///
@@ -92,9 +93,15 @@ public final class A2UITransportAdapter: A2UITransport, Sendable {
     /// - Parameters:
     ///   - onSend: The callback to invoke when ``sendRequest(_:)`` is called.
     ///   - clientCapabilities: Optional capabilities to attach to every outgoing message.
-    public init(onSend: ManualSendCallback? = nil, clientCapabilities: A2uiClientCapabilities? = nil) {
+    ///   - dataModelProvider: Optional immutable provider for current client data model snapshots.
+    public init(
+        onSend: ManualSendCallback? = nil,
+        clientCapabilities: A2uiClientCapabilities? = nil,
+        dataModelProvider: (@Sendable () -> A2uiClientDataModel?)? = nil
+    ) {
         self._onSend            = onSend
         self.clientCapabilities = clientCapabilities
+        self._dataModelProvider = dataModelProvider
 
         let parser = A2UIStreamParser()
         self._parser = parser

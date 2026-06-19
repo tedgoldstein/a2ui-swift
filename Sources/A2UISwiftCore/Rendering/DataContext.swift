@@ -110,6 +110,19 @@ public final class DataContext {
         surface.locale
     }
 
+    /// Host-owned side-effect policy and callbacks inherited from the surface.
+    public var hostServices: A2UIHostServices {
+        surface.hostServices
+    }
+
+    public func resolveURL(_ rawValue: String, purpose: A2UIURLPurpose) throws -> URL {
+        try hostServices.resolveURL(rawValue, purpose: purpose)
+    }
+
+    public func requestOpenURL(_ url: URL) throws {
+        try hostServices.openURL(url)
+    }
+
     // MARK: - resolvePath
 
     /// Resolves a path: absolute paths pass through; relative paths are joined with the base path.

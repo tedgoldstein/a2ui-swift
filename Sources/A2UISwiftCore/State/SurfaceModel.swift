@@ -31,6 +31,8 @@ public final class SurfaceModel: Identifiable {
     /// When nil, functions fall back to the client's current locale.
     /// Mirrors WebCore `SurfaceModel.locale`.
     public let locale: String?
+    /// Host-owned policy and callbacks for side effects requested by rendered UI.
+    public let hostServices: A2UIHostServices
 
     public let dataModel: DataModel
     public let componentsModel: SurfaceComponentsModel
@@ -56,7 +58,8 @@ public final class SurfaceModel: Identifiable {
         catalog: Catalog,
         theme: AnyCodable? = nil,
         sendDataModel: Bool = false,
-        locale: String? = nil
+        locale: String? = nil,
+        hostServices: A2UIHostServices = .denying
     ) {
         self.id = id
         self.catalog = catalog
@@ -64,6 +67,7 @@ public final class SurfaceModel: Identifiable {
         self.theme = theme
         self.sendDataModel = sendDataModel
         self.locale = locale
+        self.hostServices = hostServices
         self.dataModel = DataModel()
         self.componentsModel = SurfaceComponentsModel()
     }
@@ -74,14 +78,16 @@ public final class SurfaceModel: Identifiable {
         catalogId: String = "",
         theme: AnyCodable? = nil,
         sendDataModel: Bool = false,
-        locale: String? = nil
+        locale: String? = nil,
+        hostServices: A2UIHostServices = .denying
     ) {
         self.init(
             id: id,
             catalog: Catalog(id: catalogId),
             theme: theme,
             sendDataModel: sendDataModel,
-            locale: locale
+            locale: locale,
+            hostServices: hostServices
         )
     }
 

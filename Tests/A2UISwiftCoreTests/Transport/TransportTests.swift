@@ -383,6 +383,14 @@ struct A2UITransportAdapterTests {
         }
     }
 
+    @Test("getClientDataModel returns init-injected data model snapshots")
+    func getClientDataModelUsesInitInjectedProvider() {
+        let expected = A2uiClientDataModel(surfaces: ["s1": .dictionary(["status": .string("ready")])])
+        let adapter = A2UITransportAdapter(dataModelProvider: { expected })
+
+        #expect(adapter.getClientDataModel() == expected)
+    }
+
     @Test("Plain text chunks appear in incomingText, trimmed and non-empty")
     func plainTextAppearsInIncomingText() async {
         let adapter = A2UITransportAdapter()
@@ -416,11 +424,11 @@ struct A2UITransportAdapterTests {
     @Test("MCP resource payload decodes application/a2ui+json text")
     func mcpResourcePayloadDecodesMessages() throws {
         let messages = try A2UIMCPPayload.messages(
-            fromResource: [
-                "uri": .string("a2ui://legion/boot"),
-                "mimeType": .string(A2UIMCPPayload.mimeType),
-                "text": .string(createSurfaceJSON),
-            ]
+            fromResource: A2UIMCPResource(
+                uri: "a2ui://legion/boot",
+                mimeType: A2UIMCPPayload.mimeType,
+                text: createSurfaceJSON
+            )
         )
 
         #expect(messages.count == 1)
@@ -428,6 +436,18 @@ struct A2UITransportAdapterTests {
             #expect(payload.surfaceId == "s1")
         } else {
             Issue.record("Expected .createSurface from MCP resource payload")
+        }
+    }
+
+    @Test("MCP dictionary resource accepts only spec text and mimeType fields")
+    func mcpDictionaryResourceUsesSpecFieldsOnly() {
+        #expect(throws: A2UIMCPPayloadError.self) {
+            try A2UIMCPPayload.messages(
+                fromResource: [
+                    "mime_type": .string(A2UIMCPPayload.mimeType),
+                    "content": .string(createSurfaceJSON),
+                ]
+            )
         }
     }
 
@@ -455,6 +475,40 @@ struct A2UITransportAdapterTests {
             #expect(payload.surfaceId == "s1")
         } else {
             Issue.record("Expected second MCP message to delete the surface")
+        }
+    }
+
+    @Test("MCP payload rejects blob resources explicitly")
+    func mcpPayloadRejectsBlobResources() {
+        #expect(throws: A2UIMCPPayloadError.self) {
+            try A2UIMCPPayload.messages(
+                fromResource: A2UIMCPResource(
+                    uri: "a2ui://legion/blob",
+                    mimeType: A2UIMCPPayload.mimeType,
+                    blob: "eyJ2ZXJzaW9uIjoidjAuOSJ9"
+                )
+            )
+        }
+    }
+
+    @Test("MCP payload enforces a size cap before JSON decoding")
+    func mcpPayloadEnforcesSizeCap() {
+        #expect(throws: A2UIMCPPayloadError.self) {
+            try A2UIMCPPayload.messages(
+                fromText: createSurfaceJSON,
+                mimeType: A2UIMCPPayload.mimeType,
+                maximumPayloadBytes: 8
+            )
+        }
+    }
+
+    @Test("MCP payload surfaces a typed invalid JSON error")
+    func mcpPayloadReportsInvalidJSON() {
+        #expect(throws: A2UIMCPPayloadError.self) {
+            try A2UIMCPPayload.messages(
+                fromText: #"{"version":"v0.9","createSurface":42}"#,
+                mimeType: A2UIMCPPayload.mimeType
+            )
         }
     }
 

@@ -56,8 +56,7 @@ struct A2UIImage: View {
                     }
                 } else {
                     let urlString = dc.resolve(props.url)
-                    if let url = URL(string: urlString),
-                       let scheme = url.scheme, ["http", "https"].contains(scheme) {
+                    if let url = surface.hostServices.allowedURL(urlString, purpose: .image) {
                         variantContainer(variant: variant, radius: radius, sizing: sizing) {
                             AsyncImage(url: url) { phase in
                                 switch phase {

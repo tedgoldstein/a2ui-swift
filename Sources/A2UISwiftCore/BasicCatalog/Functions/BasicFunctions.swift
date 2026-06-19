@@ -13,11 +13,6 @@
 // limitations under the License.
 
 import Foundation
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
 
 // MARK: - Type coercion helpers (non-throwing)
 
@@ -494,13 +489,8 @@ private func basicPluralize(_ name: String, _ args: [String: AnyCodable], _ cont
 
 private func basicOpenUrl(_ name: String, _ args: [String: AnyCodable], _ context: DataContext) throws -> AnyCodable? {
     let urlString = try coerceRequiredString(args["url"], argName: "url", funcName: name)
-    let url = try A2UISafeURL.resolve(urlString)
-#if canImport(UIKit) && !os(watchOS)
-    DispatchQueue.main.async { UIApplication.shared.open(url) }
-#elseif canImport(AppKit)
-    NSWorkspace.shared.open(url)
-#endif
-    // watchOS has no public URL-opening API for arbitrary URLs; openUrl is a no-op there.
+    let url = try context.resolveURL(urlString, purpose: .openURL)
+    try context.requestOpenURL(url)
     return nil
 }
 

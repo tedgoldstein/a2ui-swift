@@ -33,6 +33,7 @@ import AppKit
 final class A2UIVideo: PlatformView, A2UIPlatformComponent {
 
     private var subscriptions = DataSubscriptions()
+    private var hostServices = A2UIHostServices.denying
 
     #if canImport(UIKit) && !os(watchOS)
     private let controller = AVPlayerViewController()
@@ -53,6 +54,7 @@ final class A2UIVideo: PlatformView, A2UIPlatformComponent {
     func configure(node: ComponentNode, surface: SurfaceModel, factory: ComponentFactory) {
         subscriptions.unsubscribeAll()
         guard let props = try? node.typedProperties(VideoProperties.self) else { return }
+        hostServices = surface.hostServices
         let ctx = DataContext(surface: surface, path: node.dataContextPath)
         a2ui_applyAccessibility(node.accessibility, dataContext: ctx)
         setURL(ctx.resolve(props.url))
@@ -61,7 +63,14 @@ final class A2UIVideo: PlatformView, A2UIPlatformComponent {
     }
 
     private func setURL(_ string: String) {
-        guard let url = A2UISafeURL.allowed(string) else { return }
+        guard let url = hostServices.allowedURL(string, purpose: .video) else {
+            #if canImport(UIKit) && !os(watchOS)
+            controller.player = nil
+            #elseif canImport(AppKit)
+            playerView.player = nil
+            #endif
+            return
+        }
         let player = AVPlayer(url: url)
         #if canImport(UIKit) && !os(watchOS)
         controller.player = player

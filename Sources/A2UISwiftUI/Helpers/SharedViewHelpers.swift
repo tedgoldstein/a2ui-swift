@@ -30,6 +30,7 @@ struct AudioPlayerNodeView: View {
     let label: String?
     var uiState: AudioPlayerUIState?
     var apStyle: A2UIStyle.AudioPlayerComponentStyle = .init()
+    let hostServices: A2UIHostServices
 
     private var tint: Color { apStyle.tintColor ?? .accentColor }
 
@@ -90,7 +91,7 @@ struct AudioPlayerNodeView: View {
         .clipShape(RoundedRectangle(cornerRadius: apStyle.cornerRadius ?? 10))
         .task(id: url) {
             guard let uiState, uiState.player == nil,
-                  let mediaUrl = A2UISafeURL.allowed(url) else { return }
+                  let mediaUrl = hostServices.allowedURL(url, purpose: .audio) else { return }
             let player = await Task.detached(priority: .userInitiated) {
                 AVPlayer(url: mediaUrl)
             }.value
@@ -156,6 +157,7 @@ struct AudioPlayerNodeView: View {
     let label: String?
     var uiState: AudioPlayerUIState?
     var apStyle: A2UIStyle.AudioPlayerComponentStyle = .init()
+    let hostServices: A2UIHostServices
 
     var body: some View {
         HStack(spacing: 12) {
@@ -244,6 +246,7 @@ struct VideoNodeView: View {
     var uiState: VideoUIState?
     let nodeId: String
     var cornerRadius: CGFloat = 10
+    let hostServices: A2UIHostServices
 
     private var shared: SharedPlayerController { .shared }
     private var isActive: Bool { shared.activeNodeId == nodeId }
@@ -272,7 +275,7 @@ struct VideoNodeView: View {
     private var posterView: some View {
         Button {
             if let uiState {
-                if uiState.player == nil, let url = A2UISafeURL.allowed(urlString) {
+                if uiState.player == nil, let url = hostServices.allowedURL(urlString, purpose: .video) {
                     uiState.player = AVPlayer(url: url)
                 }
                 if let player = uiState.player {
@@ -326,8 +329,9 @@ struct VideoNodeView: View {
 
         let urlStr = urlString
         let capturedState = uiState
+        let hostServices = hostServices
         Task.detached(priority: .utility) {
-            guard let url = A2UISafeURL.allowed(urlStr) else { return }
+            guard let url = hostServices.allowedURL(urlStr, purpose: .video) else { return }
             let asset = AVURLAsset(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true

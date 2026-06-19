@@ -38,7 +38,8 @@ struct A2UIAudioPlayer: View {
                 url: dc.resolve(props.url),
                 label: props.description.map { dc.resolve($0) },
                 uiState: node.uiState as? AudioPlayerUIState,
-                apStyle: style.audioPlayerStyle
+                apStyle: style.audioPlayerStyle,
+                hostServices: surface.hostServices
             )
             .a2uiAccessibility(node.accessibility, dataContext: dc)
             .padding(style.leafMargin)

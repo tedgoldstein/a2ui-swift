@@ -21,7 +21,7 @@ import Foundation
 /// Reports a user-initiated action from a component.
 /// Matches 'action' in specification/v0_9/json/client_to_server.json.
 /// Mirrors WebCore `A2uiClientAction`.
-public struct A2uiClientAction: Codable, Equatable {
+public struct A2uiClientAction: Codable, Equatable, Sendable {
     /// The name of the action, taken from the component's action.event.name property.
     public let name: String
     /// The id of the surface where the event originated.
@@ -53,7 +53,7 @@ public struct A2uiClientAction: Codable, Equatable {
 /// Reports a client-side error.
 /// Matches 'error' in specification/v0_9/json/client_to_server.json.
 /// Mirrors WebCore `A2uiClientError`.
-public struct A2uiClientError: Codable, Equatable {
+public struct A2uiClientError: Codable, Equatable, Sendable {
     /// Error code. "VALIDATION_FAILED" for validation errors; other strings for generic errors.
     public let code: String
     /// The id of the surface where the error occurred.
@@ -85,7 +85,7 @@ public struct A2uiClientError: Codable, Equatable {
 /// A message sent from the A2UI client to the server.
 /// Matches specification/v0_9/json/client_to_server.json.
 /// Mirrors WebCore `A2uiClientMessage`.
-public enum A2uiClientMessage: Codable {
+public enum A2uiClientMessage: Codable, Sendable {
     case action(A2uiClientAction)
     case error(A2uiClientError)
 
@@ -122,7 +122,7 @@ public enum A2uiClientMessage: Codable {
 /// Schema for the client data model synchronization.
 /// Matches specification/v0_9/json/client_data_model.json.
 /// Mirrors WebCore `A2uiClientDataModel`.
-public struct A2uiClientDataModel: Codable, Equatable {
+public struct A2uiClientDataModel: Codable, Equatable, Sendable {
     public let version: String
     /// A map of surface IDs to their current data models.
     public let surfaces: [String: AnyCodable]

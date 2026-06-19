@@ -32,6 +32,7 @@ final class A2UIAudioPlayer: PlatformView, A2UIPlatformComponent {
     private var timeObserver: Any?
     private var duration: Double = 0
     private var subscriptions = DataSubscriptions()
+    private var hostServices = A2UIHostServices.denying
 
     private let elapsedLabel = A2UILabelView.makeFieldLabel()
     private let durationLabel = A2UILabelView.makeFieldLabel()
@@ -57,6 +58,7 @@ final class A2UIAudioPlayer: PlatformView, A2UIPlatformComponent {
     func configure(node: ComponentNode, surface: SurfaceModel, factory: ComponentFactory) {
         subscriptions.unsubscribeAll()
         guard let props = try? node.typedProperties(AudioPlayerProperties.self) else { return }
+        hostServices = surface.hostServices
         let ctx = DataContext(surface: surface, path: node.dataContextPath)
         a2ui_applyAccessibility(node.accessibility, dataContext: ctx)
         setURL(ctx.resolve(props.url))
@@ -77,7 +79,7 @@ final class A2UIAudioPlayer: PlatformView, A2UIPlatformComponent {
         player = nil
         playing = false
         setTitle("Play")
-        guard let url = A2UISafeURL.allowed(string) else { return }
+        guard let url = hostServices.allowedURL(string, purpose: .audio) else { return }
         let player = AVPlayer(url: url)
         self.player = player
 

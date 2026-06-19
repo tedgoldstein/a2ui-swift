@@ -20,7 +20,7 @@ import Foundation
 
 /// Describes a function's interface within an inline catalog.
 /// Mirrors WebCore `FunctionDefinition`.
-public struct FunctionDefinition: Codable {
+public struct FunctionDefinition: Codable, Sendable {
     public let name: String
     public let description: String?
     /// JSON Schema object describing the function's parameters.
@@ -44,7 +44,7 @@ public struct FunctionDefinition: Codable {
 
 /// Defines a catalog inline for the A2uiClientCapabilities object.
 /// Mirrors WebCore `InlineCatalog`.
-public struct InlineCatalog: Codable {
+public struct InlineCatalog: Codable, Sendable {
     public let catalogId: String
     /// Map of component names to their JSON Schema definitions.
     public let components: [String: AnyCodable]?
@@ -69,9 +69,9 @@ public struct InlineCatalog: Codable {
 
 /// The capabilities structure sent from the client to the server as part of transport metadata.
 /// Mirrors WebCore `A2uiClientCapabilities`.
-public struct A2uiClientCapabilities: Codable {
+public struct A2uiClientCapabilities: Codable, Sendable {
 
-    public struct V09Capabilities: Codable {
+    public struct V09Capabilities: Codable, Sendable {
         public let supportedCatalogIds: [String]
         public let inlineCatalogs: [InlineCatalog]?
 

@@ -1,0 +1,32 @@
+A2UI-Swift Notices
+==================
+
+This repository is a fork used for Legion evaluation and hardening work.
+
+Provenance
+----------
+
+- Upstream project: BBC6BAE9/a2ui-swift
+- Protocol ecosystem: Google A2UI
+- Legion fork: tedgoldstein/a2ui-swift
+
+Licensing Notes
+---------------
+
+The root LICENSE file in this fork is the MIT license inherited from
+BBC6BAE9/a2ui-swift.
+
+Many source files retain file-level Apache License, Version 2.0 notices and
+Copyright 2026 Google LLC headers. Those notices are intentionally preserved.
+Files with those headers are governed by their file-level Apache-2.0 notice.
+
+Files under Sources/Primitives include Copyright 2025 GenUI Authors notices.
+Those notices are intentionally preserved.
+
+New Legion fork hardening files may use SPDX-License-Identifier: MIT where they
+are newly authored and do not derive from Apache-noticed source files.
+
+This NOTICE is not a substitute for a full OSS legal review before shipping this
+code inside a distributed product. It records the currently visible provenance
+and keeps inherited notices from being flattened into a misleading MIT-only
+representation.

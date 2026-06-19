@@ -30,6 +30,7 @@ final class A2UIImage: PlatformView, A2UIPlatformComponent {
     private let imageView = PlatformImageView()
     private var subscriptions = DataSubscriptions()
     private var loadTask: URLSessionDataTask?
+    private var hostServices = A2UIHostServices.denying
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -48,6 +49,7 @@ final class A2UIImage: PlatformView, A2UIPlatformComponent {
         guard let props = try? node.typedProperties(ImageProperties.self) else { return }
         applyFit(props.fit ?? .contain)
         applyVariant(props.variant)
+        hostServices = surface.hostServices
         let ctx = DataContext(surface: surface, path: node.dataContextPath)
         a2ui_applyAccessibility(node.accessibility, dataContext: ctx)
 
@@ -64,7 +66,7 @@ final class A2UIImage: PlatformView, A2UIPlatformComponent {
     private func load(_ urlString: String) {
         loadTask?.cancel()
         imageView.image = nil // clear any stale image before (re)loading
-        guard let url = A2UISafeURL.allowed(urlString) else { return }
+        guard let url = hostServices.allowedURL(urlString, purpose: .image) else { return }
         loadTask = URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
             guard let data, let image = PlatformImage(data: data) else { return }
             DispatchQueue.main.async { self?.imageView.image = image }
