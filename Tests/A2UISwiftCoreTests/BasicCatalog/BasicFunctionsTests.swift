@@ -711,6 +711,7 @@ struct BasicFunctionsTests {
         func safeURLSchemeAllowlist() throws {
             #expect(try A2UISafeURL.resolve("https://a2ui.org").scheme == "https")
             #expect(try A2UISafeURL.resolve("http://example.com").scheme == "http")
+            #expect(try A2UISafeURL.resolve("http://93.184.216.34").host == "93.184.216.34")
             #expect(throws: A2uiExpressionError.self) {
                 try A2UISafeURL.resolve("mailto:person@example.com")
             }
@@ -742,9 +743,54 @@ struct BasicFunctionsTests {
             }
         }
 
-        @Test("A2UISafeURL can be made permissive for trusted development fixtures")
-        func safeURLPermissivePolicyAllowsLocalDevelopmentHosts() throws {
-            let policy = A2UIURLPolicy.permissiveHTTP
+        @Test("A2UISafeURL rejects resolver-compatible SSRF host encodings")
+        func safeURLRejectsResolverCompatibleHostEncodings() throws {
+            let invalidURLs = [
+                "http://2130706433/status",
+                "http://0x7f.0.0.1/status",
+                "http://0177.0.0.1/status",
+                "http://127.1/status",
+                "http://0/status",
+                "http://localhost./status",
+                "http://0xA9FEA9FE/latest/meta-data",
+                "http://0xC0A80001/status",
+                "http://0300.0250.0001.0001/status",
+                "http://[::ffff:7f00:1]/status",
+                "http://[::ffff:127.0.0.1]/status",
+            ]
+
+            for url in invalidURLs {
+                #expect(throws: A2uiExpressionError.self) {
+                    try A2UISafeURL.resolve(url, purpose: .image)
+                }
+            }
+        }
+
+        @Test("A2UISafeURL rejects reserved non-public address ranges")
+        func safeURLRejectsReservedNonPublicRanges() throws {
+            let invalidURLs = [
+                "http://224.0.0.1/status",
+                "http://239.255.255.255/status",
+                "http://240.0.0.1/status",
+                "http://255.255.255.255/status",
+                "http://192.0.2.1/status",
+                "http://198.51.100.1/status",
+                "http://203.0.113.1/status",
+                "http://[::]/status",
+                "http://[ff02::1]/status",
+                "http://[2001:db8::1]/status",
+            ]
+
+            for url in invalidURLs {
+                #expect(throws: A2uiExpressionError.self) {
+                    try A2UISafeURL.resolve(url, purpose: .image)
+                }
+            }
+        }
+
+        @Test("A2UISafeURL can be made unsafe for trusted development fixtures")
+        func safeURLUnsafePolicyAllowsLocalDevelopmentHosts() throws {
+            let policy = A2UIURLPolicy.unsafeAllowLocalNetwork
 
             #expect(try A2UISafeURL.resolve(
                 "http://127.0.0.1:8080/status",
@@ -765,6 +811,59 @@ struct BasicFunctionsTests {
             let base = URL(string: "https://example.com/sub/page")!
             #expect(throws: A2uiExpressionError.self) {
                 try A2UISafeURL.resolve("//evil.example/path", baseURL: base)
+            }
+        }
+
+        @Test("A2UIHostServices denies media loads unless the host provides a media handler")
+        func hostServicesDenyMediaByDefault() throws {
+            #expect(A2UIHostServices.denying.allowedMediaURL("https://example.com/image.png", purpose: .image) == nil)
+        }
+
+        @Test("A2UIHostServices delegates media URL rewriting to the host")
+        func hostServicesDelegatesMediaURLRewriting() throws {
+            let hostServices = A2UIHostServices(mediaURL: { url, purpose in
+                #expect(url.absoluteString == "https://example.com/image.png")
+                #expect(purpose == .image)
+                return URL(string: "https://media-proxy.example/cache/image.png")!
+            })
+
+            let rewritten = try hostServices.mediaURL("https://example.com/image.png", purpose: .image)
+
+            #expect(rewritten.absoluteString == "https://media-proxy.example/cache/image.png")
+        }
+
+        @Test("A2UIHostServices allows strict input policy to rewrite media to a local proxy")
+        func hostServicesAllowsStrictInputRewriteToLocalProxy() throws {
+            let hostServices = A2UIHostServices(mediaURL: { url, purpose in
+                #expect(url.absoluteString == "https://example.com/image.png")
+                #expect(purpose == .image)
+                return URL(string: "http://127.0.0.1:37373/a2ui-media?url=\(url.absoluteString)")!
+            })
+
+            let rewritten = try hostServices.mediaURL("https://example.com/image.png", purpose: .image)
+
+            #expect(rewritten.host == "127.0.0.1")
+            #expect(rewritten.port == 37373)
+        }
+
+        @Test("A2UIHostServices rejects unsafe media handler outputs")
+        func hostServicesRejectsUnsafeMediaHandlerOutputs() throws {
+            let unsupportedScheme = A2UIHostServices(mediaURL: { _, _ in
+                URL(string: "file:///etc/passwd")!
+            })
+            #expect(throws: A2uiExpressionError.self) {
+                try unsupportedScheme.mediaURL("https://example.com/image.png", purpose: .image)
+            }
+
+            let userInfo = A2UIHostServices(mediaURL: { _, _ in
+                URL(string: "https://user:pass@proxy.example/image.png")!
+            })
+            #expect(throws: A2uiExpressionError.self) {
+                try userInfo.mediaURL("https://example.com/image.png", purpose: .image)
+            }
+
+            #expect(throws: A2uiExpressionError.self) {
+                try A2UIHostServices.denying.mediaURL("https://example.com/image.png", purpose: .openURL)
             }
         }
     }

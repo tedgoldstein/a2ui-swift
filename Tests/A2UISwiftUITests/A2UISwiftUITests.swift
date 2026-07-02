@@ -17,5 +17,39 @@ import SwiftUI
 import A2UISwiftCore
 import A2UISwiftUI
 
-// TODO: Add SwiftUI layer tests here
-// e.g. SurfaceViewModel, A2UIComponentView, CatalogItem overrides
+private final class SwiftUIMediaURLRecorder: @unchecked Sendable {
+    var requests: [(URL, A2UIURLPurpose)] = []
+}
+
+@Suite("SwiftUI media policy")
+struct SwiftUIMediaPolicyTests {
+    @MainActor
+    @Test("Image rendering delegates media URL resolution to host services")
+    func imageRenderingDelegatesMediaURLResolution() throws {
+        let recorder = SwiftUIMediaURLRecorder()
+        let hostServices = A2UIHostServices(mediaURL: { url, purpose in
+            recorder.requests.append((url, purpose))
+            throw A2uiExpressionError("Denied by test host.", expression: "url")
+        })
+        let surface = SurfaceModel(id: "swiftui-media", catalog: Catalog(id: "test"), hostServices: hostServices)
+        let vm = SurfaceViewModel(surface: surface)
+        try vm.processMessage(.updateComponents(UpdateComponentsPayload(
+            surfaceId: surface.id,
+            components: [
+                RawComponent(
+                    id: "root",
+                    component: "Image",
+                    properties: ["url": .string("https://media.example/image.png")]
+                ),
+            ]
+        )))
+
+        let view = A2UISurfaceView(viewModel: vm, scrolls: false)
+            .frame(width: 120, height: 120)
+        let renderer = ImageRenderer(content: view)
+        _ = renderer.cgImage
+
+        #expect(recorder.requests.map(\.0.absoluteString) == ["https://media.example/image.png"])
+        #expect(recorder.requests.map(\.1) == [.image])
+    }
+}

@@ -24,17 +24,23 @@ public final class MessageProcessor {
     public let model: SurfaceGroupModel
 
     private let catalogs: [Catalog]
+    private let hostServices: A2UIHostServices
 
     /// Creates a new message processor.
     ///
     /// - Parameters:
     ///   - catalogs: The list of available catalogs.
+    ///   - hostServices: Host-owned side-effect policy and callbacks assigned
+    ///     to every surface created by this processor. Use separate processors
+    ///     when trusted and untrusted provenance need different policies.
     ///   - actionHandler: An optional global listener for actions from all surfaces.
     public init(
         catalogs: [Catalog],
+        hostServices: A2UIHostServices = .denying,
         actionHandler: ((A2uiClientAction) -> Void)? = nil
     ) {
         self.catalogs = catalogs
+        self.hostServices = hostServices
         self.model = SurfaceGroupModel()
         if let handler = actionHandler {
             model.onAction.subscribe(handler)
@@ -141,7 +147,8 @@ public final class MessageProcessor {
             id: payload.surfaceId,
             catalog: catalog,
             theme: payload.theme,
-            sendDataModel: payload.sendDataModel
+            sendDataModel: payload.sendDataModel,
+            hostServices: hostServices
         )
         model.addSurface(surface)
     }

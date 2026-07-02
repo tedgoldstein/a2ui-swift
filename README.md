@@ -11,7 +11,7 @@
 [![SPM](https://img.shields.io/badge/SwiftPM-compatible-brightgreen)](#installation)
 [![Documentation](https://img.shields.io/badge/DocC-documentation-blue?logo=swift&logoColor=white)](https://bbc6bae9.github.io/a2ui-swift/documentation/)
 [![A2UI Spec](https://img.shields.io/badge/A2UI%20spec-v0.9-8A2BE2)](https://github.com/google/A2UI)
-[![License](https://img.shields.io/github/license/BBC6BAE9/a2ui-swift)](LICENSE)
+[![License](https://img.shields.io/badge/License-mixed%20provenance-informational)](NOTICE)
 [![Stars](https://img.shields.io/github/stars/BBC6BAE9/a2ui-swift?style=social)](https://github.com/BBC6BAE9/a2ui-swift/stargazers)
 
 </div>
@@ -70,6 +70,30 @@ if let surface = processor.model.getSurface(surfaceId) {
 }
 ```
 
+### Host side effects and media
+
+Rendered A2UI can request side effects such as `openUrl` or media loads. By
+default, `SurfaceModel` uses `A2UIHostServices.denying`: `openUrl` has no
+platform handler, and image/audio/video URLs are not fetched unless the host
+provides a media hook. Use separate `A2UIHostServices` values for trusted local
+fixtures and untrusted agent/MCP surfaces. `unsafeDirectMedia` exists only as a
+convenience for trusted demos; never use it for agent/MCP provenance because it
+does not stop DNS rebinding and still allows tracking beacons.
+
+For untrusted media, route through a host-owned proxy/cache that performs its
+own fetch policy, resolved-IP checks, caching, and response-header control:
+
+```swift
+let untrustedHostServices = A2UIHostServices(mediaURL: { originalURL, purpose in
+    var proxy = URLComponents(string: "http://127.0.0.1:37373/a2ui-media")!
+    proxy.queryItems = [
+        URLQueryItem(name: "purpose", value: purpose.rawValue),
+        URLQueryItem(name: "url", value: originalURL.absoluteString),
+    ]
+    return proxy.url!
+})
+```
+
 ## 📦 Installation
 
 Add the package via Swift Package Manager:
@@ -91,7 +115,7 @@ dependencies: [
 
 ## 🧱 Modules
 
-The package ships six independent library products — pull in only what you need:
+The package ships five independent library products — pull in only what you need:
 
 | Module | Purpose |
 |--------|---------|
@@ -100,7 +124,9 @@ The package ships six independent library products — pull in only what you nee
 | **A2UIUIKit** | v0.9 UIKit renderer for iOS, tvOS, and visionOS via `A2UISurfaceHostView` |
 | **A2UIAppKit** | v0.9 AppKit renderer for macOS via `A2UISurfaceHostView` |
 | **Primitives** | Shared primitive types — `ChatMessage`, `Part`, `JSONValue`, `ToolDefinition`, etc. |
-| ~~**v_08**~~ | ⚠️ **Deprecated** — v0.8 renderer via `A2UIRendererView` with `SurfaceManager` |
+
+The legacy v0.8 renderer remains in the source tree for tests and historical
+sample compatibility, but it is no longer exported as a SwiftPM library product.
 
 Full API reference for every module is published at the [DocC documentation site](https://bbc6bae9.github.io/a2ui-swift/documentation/).
 

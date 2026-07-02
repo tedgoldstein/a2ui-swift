@@ -63,11 +63,13 @@ struct RizzCustomCatalog: CustomComponentCatalog {
 @Observable
 final class SurfaceStore {
     let catalog: Catalog
+    let hostServices: A2UIHostServices
     private(set) var orderedSurfaceIds: [String] = []
     private(set) var viewModels: [String: SurfaceViewModel] = [:]
 
-    init(catalog: Catalog = demoCatalog) {
+    init(catalog: Catalog = demoCatalog, hostServices: A2UIHostServices = .unsafeDirectMedia) {
         self.catalog = catalog
+        self.hostServices = hostServices
     }
 
     func viewModel(for surfaceId: String) -> SurfaceViewModel? {
@@ -90,7 +92,8 @@ final class SurfaceStore {
                 id: payload.surfaceId,
                 catalog: catalog,
                 theme: payload.theme,
-                sendDataModel: payload.sendDataModel
+                sendDataModel: payload.sendDataModel,
+                hostServices: hostServices
             )
             let vm = SurfaceViewModel(surface: surface)
             viewModels[payload.surfaceId] = vm

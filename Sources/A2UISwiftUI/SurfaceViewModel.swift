@@ -77,8 +77,8 @@ public final class SurfaceViewModel {
 
     /// Creates a SurfaceViewModel with a new SurfaceModel for the given catalog.
     /// Convenience for simple single-surface apps.
-    public convenience init(catalog: Catalog) {
-        self.init(surface: SurfaceModel(id: UUID().uuidString, catalog: catalog))
+    public convenience init(catalog: Catalog, hostServices: A2UIHostServices = .denying) {
+        self.init(surface: SurfaceModel(id: UUID().uuidString, catalog: catalog, hostServices: hostServices))
     }
 
     // MARK: - Message Processing

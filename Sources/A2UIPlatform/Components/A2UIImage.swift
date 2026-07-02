@@ -66,8 +66,9 @@ final class A2UIImage: PlatformView, A2UIPlatformComponent {
     private func load(_ urlString: String) {
         loadTask?.cancel()
         imageView.image = nil // clear any stale image before (re)loading
-        guard let url = hostServices.allowedURL(urlString, purpose: .image) else { return }
-        loadTask = URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+        guard let url = hostServices.allowedMediaURL(urlString, purpose: .image) else { return }
+        loadTask = URLSession.shared.dataTask(with: url) { [weak self] data, response, _ in
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return }
             guard let data, let image = PlatformImage(data: data) else { return }
             DispatchQueue.main.async { self?.imageView.image = image }
         }

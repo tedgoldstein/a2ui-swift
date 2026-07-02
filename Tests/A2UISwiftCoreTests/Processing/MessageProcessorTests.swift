@@ -20,10 +20,11 @@ import Foundation
 
 private func makeProcessor(
     catalogId: String = "test-catalog",
+    hostServices: A2UIHostServices = .denying,
     actionHandler: ((A2uiClientAction) -> Void)? = nil
 ) -> MessageProcessor {
     let catalog = Catalog(id: catalogId)
-    return MessageProcessor(catalogs: [catalog], actionHandler: actionHandler)
+    return MessageProcessor(catalogs: [catalog], hostServices: hostServices, actionHandler: actionHandler)
 }
 
 private func createSurfaceMsg(
@@ -62,6 +63,17 @@ struct MessageProcessorTests {
         processor.processMessages([createSurfaceMsg(surfaceId: "s1", sendDataModel: true)])
 
         #expect(processor.model.getSurface("s1")?.sendDataModel == true)
+    }
+
+    @Test("created surfaces inherit processor host services")
+    func createdSurfaceInheritsHostServices() throws {
+        let hostServices = A2UIHostServices.unsafeDirectMedia
+        let processor = makeProcessor(hostServices: hostServices)
+
+        processor.processMessages([createSurfaceMsg(surfaceId: "s1")])
+
+        let surface = try #require(processor.model.getSurface("s1"))
+        #expect(surface.hostServices.allowedMediaURL("https://example.com/image.png", purpose: .image) != nil)
     }
 
     // MARK: getClientDataModel

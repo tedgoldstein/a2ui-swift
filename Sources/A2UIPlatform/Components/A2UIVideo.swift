@@ -63,7 +63,7 @@ final class A2UIVideo: PlatformView, A2UIPlatformComponent {
     }
 
     private func setURL(_ string: String) {
-        guard let url = hostServices.allowedURL(string, purpose: .video) else {
+        guard let url = hostServices.allowedMediaURL(string, purpose: .video) else {
             #if canImport(UIKit) && !os(watchOS)
             controller.player = nil
             #elseif canImport(AppKit)

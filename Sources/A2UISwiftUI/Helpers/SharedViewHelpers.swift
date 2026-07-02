@@ -91,7 +91,7 @@ struct AudioPlayerNodeView: View {
         .clipShape(RoundedRectangle(cornerRadius: apStyle.cornerRadius ?? 10))
         .task(id: url) {
             guard let uiState, uiState.player == nil,
-                  let mediaUrl = hostServices.allowedURL(url, purpose: .audio) else { return }
+                  let mediaUrl = hostServices.allowedMediaURL(url, purpose: .audio) else { return }
             let player = await Task.detached(priority: .userInitiated) {
                 AVPlayer(url: mediaUrl)
             }.value
@@ -275,7 +275,7 @@ struct VideoNodeView: View {
     private var posterView: some View {
         Button {
             if let uiState {
-                if uiState.player == nil, let url = hostServices.allowedURL(urlString, purpose: .video) {
+                if uiState.player == nil, let url = hostServices.allowedMediaURL(urlString, purpose: .video) {
                     uiState.player = AVPlayer(url: url)
                 }
                 if let player = uiState.player {
@@ -331,7 +331,7 @@ struct VideoNodeView: View {
         let capturedState = uiState
         let hostServices = hostServices
         Task.detached(priority: .utility) {
-            guard let url = hostServices.allowedURL(urlStr, purpose: .video) else { return }
+            guard let url = hostServices.allowedMediaURL(urlStr, purpose: .video) else { return }
             let asset = AVURLAsset(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true

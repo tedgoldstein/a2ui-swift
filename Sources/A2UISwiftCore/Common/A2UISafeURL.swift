@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 /// The reason an A2UI payload wants to resolve a URL.
 public enum A2UIURLPurpose: String, Sendable {
@@ -47,9 +52,11 @@ public struct A2UIURLPolicy: Equatable, Sendable {
 
     public static let strict = A2UIURLPolicy()
 
-    /// Useful for trusted development fixtures. Do not use this for untrusted
-    /// agent or MCP-provided UI.
-    public static let permissiveHTTP = A2UIURLPolicy(
+    /// Unsafe escape hatch for trusted development fixtures. This permits URL
+    /// credentials, localhost, private/link-local networks, `.local` names, and
+    /// relative URL host changes. Do not use it for untrusted agent or
+    /// MCP-provided UI.
+    public static let unsafeAllowLocalNetwork = A2UIURLPolicy(
         allowsUserInfo: true,
         allowsLocalhost: true,
         allowsPrivateNetworkHosts: true,
@@ -57,6 +64,9 @@ public struct A2UIURLPolicy: Equatable, Sendable {
         allowsDotLocalHosts: true,
         allowsRelativeHostChanges: true
     )
+
+    @available(*, deprecated, renamed: "unsafeAllowLocalNetwork")
+    public static let permissiveHTTP = unsafeAllowLocalNetwork
 
     public func validate(_ url: URL, baseURL: URL? = nil, purpose: A2UIURLPurpose = .openURL) throws {
         guard let scheme = url.scheme?.lowercased(), allowedSchemes.contains(scheme) else {
@@ -90,29 +100,19 @@ public struct A2UIURLPolicy: Equatable, Sendable {
         if !allowsDotLocalHosts && Self.isDotLocalHost(normalized) {
             throw A2uiExpressionError(".local URLs are not allowed for \(purpose.rawValue).", expression: "url")
         }
-        if let network = Self.ipv4NetworkKind(normalized) {
+        if let network = Self.networkKind(normalized) {
             switch network {
             case .localhost where !allowsLocalhost:
                 throw A2uiExpressionError("Loopback URLs are not allowed for \(purpose.rawValue).", expression: "url")
             case .privateNetwork where !allowsPrivateNetworkHosts:
-                throw A2uiExpressionError("Private network URLs are not allowed for \(purpose.rawValue).", expression: "url")
+                throw A2uiExpressionError("Private or reserved network URLs are not allowed for \(purpose.rawValue).", expression: "url")
             case .linkLocal where !allowsLinkLocalHosts:
                 throw A2uiExpressionError("Link-local URLs are not allowed for \(purpose.rawValue).", expression: "url")
             default:
                 break
             }
-        }
-        if let network = Self.ipv6NetworkKind(normalized) {
-            switch network {
-            case .localhost where !allowsLocalhost:
-                throw A2uiExpressionError("Loopback URLs are not allowed for \(purpose.rawValue).", expression: "url")
-            case .privateNetwork where !allowsPrivateNetworkHosts:
-                throw A2uiExpressionError("Private network URLs are not allowed for \(purpose.rawValue).", expression: "url")
-            case .linkLocal where !allowsLinkLocalHosts:
-                throw A2uiExpressionError("Link-local URLs are not allowed for \(purpose.rawValue).", expression: "url")
-            default:
-                break
-            }
+        } else if !allowsPrivateNetworkHosts && Self.isAmbiguousNumericHost(normalized) {
+            throw A2uiExpressionError("Ambiguous numeric URL hosts are not allowed for \(purpose.rawValue).", expression: "url")
         }
     }
 
@@ -123,10 +123,14 @@ public struct A2UIURLPolicy: Equatable, Sendable {
     }
 
     private static func normalizedHost(_ host: String) -> String {
-        host
+        var normalized = host
             .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+        while normalized.count > 1, normalized.hasSuffix(".") {
+            normalized.removeLast()
+        }
+        return normalized
     }
 
     private static func isLocalhost(_ host: String) -> Bool {
@@ -137,53 +141,130 @@ public struct A2UIURLPolicy: Equatable, Sendable {
         host == "local" || host.hasSuffix(".local")
     }
 
-    private static func ipv4NetworkKind(_ host: String) -> NetworkKind? {
-        let pieces = host.split(separator: ".", omittingEmptySubsequences: false)
-        guard pieces.count == 4 else { return nil }
-        var octets: [Int] = []
-        for piece in pieces {
-            guard let value = Int(piece), (0...255).contains(value) else { return nil }
-            octets.append(value)
+    private static func networkKind(_ host: String) -> NetworkKind? {
+        let hostWithoutZone = host.split(separator: "%", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? host
+        if let octets = ipv4Octets(hostWithoutZone) {
+            return ipv4NetworkKind(octets)
         }
+        if let bytes = ipv6Bytes(hostWithoutZone) {
+            return ipv6NetworkKind(bytes)
+        }
+        return nil
+    }
 
-        switch (octets[0], octets[1]) {
-        case (0, _), (127, _):
+    private static func ipv4Octets(_ host: String) -> [UInt8]? {
+        #if canImport(Darwin) || canImport(Glibc)
+        var address = in_addr()
+        guard inet_aton(host, &address) == 1 else { return nil }
+        return withUnsafeBytes(of: address) { Array($0) }
+        #else
+        return nil
+        #endif
+    }
+
+    private static func ipv6Bytes(_ host: String) -> [UInt8]? {
+        #if canImport(Darwin) || canImport(Glibc)
+        var address = in6_addr()
+        guard inet_pton(AF_INET6, host, &address) == 1 else { return nil }
+        return withUnsafeBytes(of: address) { Array($0) }
+        #else
+        return nil
+        #endif
+    }
+
+    private static func ipv4NetworkKind(_ octets: [UInt8]) -> NetworkKind? {
+        guard octets.count == 4 else { return nil }
+
+        switch (octets[0], octets[1], octets[2]) {
+        case (0, _, _), (127, _, _):
             return .localhost
-        case (10, _), (192, 168):
+        case (10, _, _), (192, 168, _):
             return .privateNetwork
-        case (172, 16...31), (100, 64...127), (198, 18...19):
+        case (172, 16...31, _), (100, 64...127, _), (198, 18...19, _):
             return .privateNetwork
-        case (169, 254):
+        case (192, 0, 0), (192, 0, 2), (198, 51, 100), (203, 0, 113):
+            return .privateNetwork
+        case (224...255, _, _):
+            return .privateNetwork
+        case (169, 254, _):
             return .linkLocal
         default:
             return nil
         }
     }
 
-    private static func ipv6NetworkKind(_ host: String) -> NetworkKind? {
-        if host == "::1" || host == "0:0:0:0:0:0:0:1" {
+    private static func ipv6NetworkKind(_ bytes: [UInt8]) -> NetworkKind? {
+        guard bytes.count == 16 else { return nil }
+        if bytes.allSatisfy({ $0 == 0 }) {
             return .localhost
         }
-        if host.hasPrefix("::ffff:") {
-            return ipv4NetworkKind(String(host.dropFirst("::ffff:".count)))
+        if bytes[0..<15].allSatisfy({ $0 == 0 }), bytes[15] == 1 {
+            return .localhost
         }
-        guard let first = host.split(separator: ":", maxSplits: 1).first,
-              let hextet = Int(first, radix: 16)
-        else { return nil }
-        if (hextet & 0xffc0) == 0xfe80 {
+        if bytes[0..<10].allSatisfy({ $0 == 0 }),
+           bytes[10] == 0xff,
+           bytes[11] == 0xff {
+            return ipv4NetworkKind(Array(bytes[12..<16]))
+        }
+        if bytes[0..<12].allSatisfy({ $0 == 0 }),
+           bytes[12..<16].contains(where: { $0 != 0 }) {
+            return ipv4NetworkKind(Array(bytes[12..<16]))
+        }
+        if bytes[0] == 0xfe, (bytes[1] & 0xc0) == 0x80 {
             return .linkLocal
         }
-        if (hextet & 0xfe00) == 0xfc00 {
+        if (bytes[0] & 0xfe) == 0xfc || bytes[0] == 0xff {
+            return .privateNetwork
+        }
+        if bytes[0] == 0x20, bytes[1] == 0x01, bytes[2] == 0x0d, bytes[3] == 0xb8 {
             return .privateNetwork
         }
         return nil
     }
+
+    private static func isAmbiguousNumericHost(_ host: String) -> Bool {
+        if isCanonicalDottedDecimalIPv4(host) {
+            return false
+        }
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard !labels.isEmpty, labels.allSatisfy({ !$0.isEmpty }) else { return false }
+        return labels.allSatisfy { label in
+            let lower = label.lowercased()
+            if lower.hasPrefix("0x") {
+                return containsOnly(lower.dropFirst(2), allowed: .a2uiHexDigits)
+            }
+            return containsOnly(lower[...], allowed: .decimalDigits)
+        }
+    }
+
+    private static func isCanonicalDottedDecimalIPv4(_ host: String) -> Bool {
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count == 4 else { return false }
+        return labels.allSatisfy { label in
+            guard containsOnly(label, allowed: .decimalDigits),
+                  let value = Int(label),
+                  (0...255).contains(value)
+            else { return false }
+            return label == "0" || !label.hasPrefix("0")
+        }
+    }
+
+    private static func containsOnly<S: StringProtocol>(_ text: S, allowed: CharacterSet) -> Bool {
+        !text.isEmpty && text.unicodeScalars.allSatisfy { allowed.contains($0) }
+    }
+}
+
+private extension CharacterSet {
+    static let a2uiHexDigits = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
 }
 
 /// URL validation shared by local A2UI functions and media components.
 ///
 /// A2UI payloads can cross trust boundaries. Host applications should inject a
-/// policy appropriate for the provenance of the payload.
+/// policy appropriate for the provenance of the payload. Host-string validation
+/// is defense-in-depth only: DNS rebinding can still make a public hostname
+/// resolve to a private address at connection time, so untrusted media should be
+/// delegated through host-owned fetch/proxy/cache services.
 public enum A2UISafeURL {
     public static let allowedSchemes: Set<String> = ["http", "https"]
 

@@ -31,10 +31,6 @@ let package = Package(
             targets: ["Primitives"]
         ),
         .library(
-            name: "v_08",
-            targets: ["v_08"]
-        ),
-        .library(
             name: "A2UISwiftCore",
             targets: ["A2UISwiftCore"]
         ),

@@ -49,7 +49,7 @@ final class DemoViewController: UIViewController {
                                   componentNames: basicCatalog.componentNames,
                                   functions: basicCatalog.functions)
 
-            let processor = MessageProcessor(catalogs: [catalog]) { action in
+            let processor = MessageProcessor(catalogs: [catalog], hostServices: .unsafeDirectMedia) { action in
                 print("▶︎ action:", action.name, action.context)
             }
             self.processor = processor

@@ -70,6 +70,13 @@ struct SurfaceViewModelCreateTests {
         // (exact colour assertion not needed — just verifies no crash)
         _ = vm.a2uiStyle
     }
+
+    @Test("convenience init accepts host services")
+    func convenienceInitAcceptsHostServices() {
+        let vm = SurfaceViewModel(catalog: Catalog(id: "test-catalog"), hostServices: .unsafeDirectMedia)
+
+        #expect(vm.surface.hostServices.allowedMediaURL("https://example.com/image.png", purpose: .image) != nil)
+    }
 }
 
 // MARK: - processMessage: updateComponents
